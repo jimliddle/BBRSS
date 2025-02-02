@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" 
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  <title>BB RSS Reader</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-size: 14px;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      padding: 10px;
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: #000;
+      color: #fff;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #headerSection {
+      background: #1a1a1a;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      box-shadow: 0 2px 4px rgba(255, 255, 255, 0.1);
+    }
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    /* Reduce extra spacing for header links */
+    .header-links-group {
+      margin-bottom: 0 !important;
+      padding-bottom: 0;
+    }
+    input[type="text"], select {
+      flex-grow: 1;
+      padding: 8px;
+      border: 1px solid #333;
+      border-radius: 4px;
+      background: #2a2a2a;
+      color: #fff;
+      height: 40px;
+      font-size: 14px !important;
+    }
+    /* Updated select styling to center the text */
+    select {
+      background-color: #2a2a2a !important;
+      color: #fff !important;
+      border: 1px solid #fff;
+      height: 40px;          /* Fixed height */
+      line-height: 40px;     /* Matches the height */
+      padding: 0 5px;        /* No extra vertical padding */
+      font-size: 14px;
+      vertical-align: middle;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    /* Header links styling (white) */
+    .header-link {
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+      margin-right: 10px;
+      line-height: 40px;
+    }
+    #feedContainer {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 10px;
+      flex-grow: 1;
+      overflow-y: auto;
+      height: 60vh;
+    }
+    .category-section {
+      margin-bottom: 20px;
+    }
+    .category-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 5px;
+    }
+    /* Category toggle links in white */
+    .cat-toggle {
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .feed-content {
+      /* Container for feeds under a category */
+    }
+    .feed-source {
+      margin-bottom: 10px;
+    }
+    .feed-item {
+      background: #333;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+    .feed-item.read {
+      opacity: 0.6;
+    }
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .feed-title {
+      color: #4a9eff;
+      font-weight: bold;
+      flex-grow: 1;
+    }
+    .feed-date {
+      font-size: 12px;
+      color: #aaa;
+      margin-left: 10px;
+      white-space: nowrap;
+    }
+    /* Yellow links for Expand and Open */
+    .toggle-link, .open-link {
+      color: yellow;
+      text-decoration: none;
+      margin-left: 5px;
+      font-size: 12px;
+    }
+    /* Red link for Delete */
+    .delete-link {
+      color: red;
+      text-decoration: none;
+      margin-left: 5px;
+      font-size: 12px;
+    }
+    .feed-description {
+      margin-top: 10px;
+      padding: 5px;
+      background: #444;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+    /* Ensure links inside descriptions are visible */
+    .feed-description a:link,
+    .feed-description a:visited {
+      color: #4a9eff;
+      text-decoration: underline;
+    }
+    .feed-description a:hover {
+      color: #6cb2ff;
+    }
+    .status-message {
+      color: #4CAF50;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="headerSection">
+    <div class="input-group">
+      <input type="text" id="feedUrl" placeholder="Enter RSS Feed URL">
+      <select id="feedCategory">
+        <option value="General">General</option>
+        <option value="News">News</option>
+        <option value="Technology">Technology</option>
+        <option value="Sports">Sports</option>
+        <option value="AI">AI</option>
+      </select>
+      <button onclick="addFeed()">Add Feed</button>
+    </div>
+    <div class="input-group header-links-group">
+      <!-- Refresh All and Clear All as white links -->
+      <a href="#" class="header-link" onclick="refreshAllFeeds(); return false;">Refresh All</a>
+      <a href="#" class="header-link" onclick="clearAllData(); return false;">Clear All</a>
+    </div>
+  </div>
+
+  <div id="feedContainer"></div>
+
+  <script>
+    // Add a new storage key for persistently deleted items.
+    var STORAGE_KEYS = {
+      FEEDS: 'bb_rss_feeds',
+      READ_ITEMS: 'bb_rss_read_items',
+      DELETED_ITEMS: 'bb_rss_deleted_items'
+    };
+
+    function getStoredData(key) {
+      try {
+        return JSON.parse(localStorage.getItem(key)) || {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function setStoredData(key, data) {
+      localStorage.setItem(key, JSON.stringify(data));
+    }
+
+    // Update addFeed (unchanged)
+    function addFeed() {
+      var feedUrl = document.getElementById('feedUrl').value.trim();
+      var category = document.getElementById('feedCategory').value;
+      
+      if (!feedUrl) {
+        showStatus('Please enter a valid RSS URL');
+        return;
+      }
+
+      var feeds = getStoredData(STORAGE_KEYS.FEEDS);
+      if (!feeds[category]) feeds[category] = {};
+      feeds[category][feedUrl] = [];
+      
+      setStoredData(STORAGE_KEYS.FEEDS, feeds);
+      document.getElementById('feedUrl').value = '';
+      refreshFeed(feedUrl, category);
+      showStatus('Feed added successfully');
+    }
+
+    // Update refreshFeed so that it loops over more items, filters out deleted ones,
+    // and then takes the first 10 items.
+    function refreshFeed(url, category) {
+      var xhr = new XMLHttpRequest();
+      // Use a proxy to bypass CORS restrictions.
+      xhr.open('GET', 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url), true);
+      
+      xhr.onreadystatechange = function() {
+        if (xhr.readyState === 4 && xhr.status === 200) {
+          var parser = new DOMParser();
+          var xmlDoc = parser.parseFromString(xhr.responseText, "text/xml");
+          // Try RSS first, else Atom.
+          var items = xmlDoc.getElementsByTagName('item');
+          var isRSS = true;
+          if (items.length === 0) {
+            items = xmlDoc.getElementsByTagName('entry');
+            isRSS = false;
+          }
+          var feedItems = [];
+          // Instead of only iterating over 10 items, iterate over up to 20.
+          for (var i = 0; i < Math.min(items.length, 20); i++) {
+            var item = items[i];
+            var title = '', link = '', pubDate = '', description = '';
+            
+            if (isRSS) {
+              var titleNode = item.getElementsByTagName('title')[0];
+              var linkNode = item.getElementsByTagName('link')[0];
+              var dateNode = item.getElementsByTagName('pubDate')[0];
+              var descNode = item.getElementsByTagName('description')[0];
+              title = titleNode ? titleNode.textContent : 'No title';
+              link = linkNode ? linkNode.textContent : '#';
+              pubDate = dateNode ? dateNode.textContent : '';
+              description = descNode ? descNode.textContent : 'No description available';
+              // Optionally check for content:encoded
+              var contentNode = item.getElementsByTagName('content:encoded')[0];
+              if (contentNode && contentNode.textContent) {
+                description = contentNode.textContent;
+              }
+            } else {
+              // Atom parsing.
+              var titleNode = item.getElementsByTagName('title')[0];
+              title = titleNode ? titleNode.textContent : 'No title';
+              var linkNodes = item.getElementsByTagName('link');
+              for (var j = 0; j < linkNodes.length; j++) {
+                var rel = linkNodes[j].getAttribute('rel');
+                if (!rel || rel === 'alternate') {
+                  link = linkNodes[j].getAttribute('href');
+                  break;
+                }
+              }
+              if (!link) link = '#';
+              var dateNode = item.getElementsByTagName('published')[0];
+              if (!dateNode) {
+                dateNode = item.getElementsByTagName('updated')[0];
+              }
+              pubDate = dateNode ? dateNode.textContent : '';
+              var contentNode = item.getElementsByTagName('content')[0];
+              if (contentNode && contentNode.textContent) {
+                description = contentNode.textContent;
+              } else {
+                var summaryNode = item.getElementsByTagName('summary')[0];
+                description = summaryNode ? summaryNode.textContent : 'No description available';
+              }
+            }
+            
+            feedItems.push({
+              title: title,
+              link: link,
+              pubDate: pubDate,
+              description: description
+            });
+          }
+
+          // Get the persistent deletion list and filter out any items that have been deleted.
+          var deleted = getStoredData(STORAGE_KEYS.DELETED_ITEMS);
+          feedItems = feedItems.filter(function(item) {
+            return !deleted[item.link];
+          });
+          // Only keep the first 10 items after filtering.
+          feedItems = feedItems.slice(0, 10);
+
+          var feeds = getStoredData(STORAGE_KEYS.FEEDS);
+          if (!feeds[category]) feeds[category] = {};
+          feeds[category][url] = feedItems;
+          setStoredData(STORAGE_KEYS.FEEDS, feeds);
+          displayFeeds();
+          showStatus('Feed updated successfully');
+        }
+      };
+      
+      xhr.onerror = function() {
+        showStatus('Network error occurred');
+      };
+      
+      xhr.send();
+    }
+
+    function refreshAllFeeds() {
+      var feeds = getStoredData(STORAGE_KEYS.FEEDS);
+      for (var category in feeds) {
+        if (feeds.hasOwnProperty(category)) {
+          for (var url in feeds[category]) {
+            if (feeds[category].hasOwnProperty(url)) {
+              refreshFeed(url, category);
+            }
+          }
+        }
+      }
+    }
+
+    // When deleting an item, add its link to the persistent deletion list.
+    function deleteFeedItem(link) {
+      // Retrieve the deletion list (as an object where each key is a link)
+      var deleted = getStoredData(STORAGE_KEYS.DELETED_ITEMS);
+      deleted[link] = true;
+      setStoredData(STORAGE_KEYS.DELETED_ITEMS, deleted);
+      
+      // Also remove the item from the current feeds in storage.
+      var feeds = getStoredData(STORAGE_KEYS.FEEDS);
+      for (var category in feeds) {
+        if (feeds.hasOwnProperty(category)) {
+          for (var url in feeds[category]) {
+            if (feeds[category].hasOwnProperty(url)) {
+              feeds[category][url] = feeds[category][url].filter(function(item) {
+                return item.link !== link;
+              });
+            }
+          }
+        }
+      }
+      setStoredData(STORAGE_KEYS.FEEDS, feeds);
+      displayFeeds();
+    }
+
+    function displayFeeds() {
+      var container = document.getElementById('feedContainer');
+      container.innerHTML = '';
+      var feeds = getStoredData(STORAGE_KEYS.FEEDS);
+      // The "readItems" mechanism is still here for legacy if needed.
+      var readItems = getStoredData(STORAGE_KEYS.READ_ITEMS);
+
+      for (var category in feeds) {
+        if (feeds.hasOwnProperty(category)) {
+          var categoryDiv = document.createElement('div');
+          categoryDiv.className = 'category-section';
+
+          var header = document.createElement('h3');
+          header.className = 'category-title';
+          header.textContent = category;
+          
+          var catToggleLink = document.createElement('a');
+          catToggleLink.href = "#";
+          catToggleLink.className = 'cat-toggle';
+          catToggleLink.textContent = ' [Collapse]';
+          header.appendChild(catToggleLink);
+          categoryDiv.appendChild(header);
+          
+          var feedContent = document.createElement('div');
+          feedContent.className = 'feed-content';
+          
+          for (var url in feeds[category]) {
+            if (feeds[category].hasOwnProperty(url)) {
+              var feedSourceDiv = document.createElement('div');
+              feedSourceDiv.className = 'feed-source';
+              
+              feeds[category][url].forEach(function(item) {
+                var itemDiv = document.createElement('div');
+                // If the item is in the old readItems list, we add the "read" class,
+                // though our deletion list now overrides display.
+                itemDiv.className = 'feed-item' + (readItems[item.link] ? ' read' : '');
+                
+                var headerDiv = document.createElement('div');
+                headerDiv.className = 'feed-header';
+                var titleDiv = document.createElement('div');
+                titleDiv.className = 'feed-title';
+                titleDiv.textContent = item.title;
+                var dateDiv = document.createElement('div');
+                dateDiv.className = 'feed-date';
+                dateDiv.textContent = item.pubDate;
+                headerDiv.appendChild(titleDiv);
+                headerDiv.appendChild(dateDiv);
+
+                // Create the Expand link.
+                var toggleLink = document.createElement('a');
+                toggleLink.href = "#";
+                toggleLink.className = 'toggle-link';
+                toggleLink.textContent = 'Expand';
+                
+                // Container for the article description.
+                var descDiv = document.createElement('div');
+                descDiv.className = 'feed-description';
+                descDiv.innerHTML = item.description;
+                descDiv.style.display = 'none';
+
+                // Toggle the description display.
+                toggleLink.onclick = function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (descDiv.style.display === 'none') {
+                    descDiv.style.display = 'block';
+                    toggleLink.textContent = 'Refold';
+                  } else {
+                    descDiv.style.display = 'none';
+                    toggleLink.textContent = 'Expand';
+                  }
+                };
+
+                // Create the Open link.
+                var openLink = document.createElement('a');
+                openLink.href = item.link;
+                openLink.className = 'open-link';
+                openLink.textContent = 'Open';
+                openLink.target = '_blank';
+                openLink.onclick = function(e) {
+                  e.stopPropagation();
+                };
+
+                // Create the Delete link.
+                var deleteLink = document.createElement('a');
+                deleteLink.href = "#";
+                deleteLink.className = 'delete-link';
+                deleteLink.textContent = 'Delete';
+                deleteLink.onclick = function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  deleteFeedItem(item.link);
+                };
+
+                itemDiv.appendChild(headerDiv);
+                itemDiv.appendChild(toggleLink);
+                itemDiv.appendChild(document.createTextNode(' '));
+                itemDiv.appendChild(openLink);
+                itemDiv.appendChild(document.createTextNode(' '));
+                itemDiv.appendChild(deleteLink);
+                itemDiv.appendChild(descDiv);
+
+                feedSourceDiv.appendChild(itemDiv);
+              });
+              
+              feedContent.appendChild(feedSourceDiv);
+            }
+          }
+          
+          // IIFE so each category toggle works independently.
+          (function(fc, ctl) {
+            ctl.onclick = function(e) {
+              e.preventDefault();
+              if (fc.style.display === 'none') {
+                fc.style.display = 'block';
+                ctl.textContent = ' [Collapse]';
+              } else {
+                fc.style.display = 'none';
+                ctl.textContent = ' [Expand]';
+              }
+            };
+          })(feedContent, catToggleLink);
+
+          categoryDiv.appendChild(feedContent);
+          container.appendChild(categoryDiv);
+        }
+      }
+    }
+
+    function clearAllData() {
+      if (confirm('Clear all feeds and read items?')) {
+        localStorage.removeItem(STORAGE_KEYS.FEEDS);
+        localStorage.removeItem(STORAGE_KEYS.READ_ITEMS);
+        localStorage.removeItem(STORAGE_KEYS.DELETED_ITEMS);
+        displayFeeds();
+        showStatus('All data cleared');
+      }
+    }
+
+    function showStatus(message) {
+      var status = document.createElement('div');
+      status.className = 'status-message';
+      status.textContent = message;
+      document.body.appendChild(status);
+      setTimeout(function() { status.remove(); }, 3000);
+    }
+
+    // Initial load and auto-refresh every hour.
+    displayFeeds();
+    setInterval(refreshAllFeeds, 3600000);
+  </script>
+</body>
+</html>
