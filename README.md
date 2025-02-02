@@ -5,6 +5,6 @@ A Blackberry RSS Reader that works directly within the BlackBerry Browser. Desig
 
 It uses the browser local storage to persist data and the allorigins proxy to bypass CORS restrictions when using a local html file.
 
-10 items will be displayed for each feed iten. RSS content can be hidden and expanded. Categories can be expanded and contracted.
+10 items will be displayed for each feed item. RSS content can be hidden and expanded. Categories can be expanded and contracted.
 
 Save the file locally, open it in the BlackBerry default browser and bookmark.
